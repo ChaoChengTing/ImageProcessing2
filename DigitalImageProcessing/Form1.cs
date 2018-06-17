@@ -39,11 +39,22 @@ namespace DigitalImageProcessing
 
         private bool IsMouseDown = false;
 
+        private Point mouseDownPosition, mouseUpPosition = new Point();
+        private bool IsSelection = false;
+        private bool IsTracking = false;
+
         // CamShift
         private Mat map;
 
         private Button nowClick = null;
 
+        private DenseHistogram hist = new DenseHistogram(30, new RangeF(0, 180));
+        private Rectangle rectangle = new Rectangle(),
+                            selection = new Rectangle();
+        private Image<Gray, Byte> hue = new Image<Gray, Byte>(320, 240),
+                                    mask = new Image<Gray, Byte>(320, 240),
+                                    backProjection = new Image<Gray, Byte>(320, 240);
+            
         public Form1()
         {
             InitializeComponent();
@@ -261,14 +272,31 @@ namespace DigitalImageProcessing
 
         private void _sourcePictureBox_mouseDown(object sender, MouseEventArgs e)
         {
+            IsTracking = false;
+            IsSelection = false;
+            mouseDownPosition = e.Location;
+            if (mouseDownPosition.X < 0) mouseDownPosition.X = 0;
+            if (mouseDownPosition.Y < 0) mouseDownPosition.Y = 0;
+            if (mouseDownPosition.X >= _sourceImage.Width) mouseDownPosition.X = _sourceImage.Width - 1;
+            if (mouseDownPosition.Y >= _sourceImage.Height) mouseDownPosition.Y = _sourceImage.Height - 1;
+            IsMouseDown = true;
         }
 
         private void _sourcePictureBox_mouseMove(object sender, MouseEventArgs e)
         {
+            if (IsMouseDown) mouseUpPosition = e.Location;
         }
 
         private void _sourcePictureBox_mouseUp(object sender, MouseEventArgs e)
         {
+            mouseUpPosition = e.Location;
+            if (mouseUpPosition.X < 0) mouseUpPosition.X = 0;
+            if (mouseUpPosition.Y < 0) mouseUpPosition.Y = 0;
+            if (mouseUpPosition.X >= _sourceImage.Width) mouseUpPosition.X = _sourceImage.Width - 1;
+            if (mouseUpPosition.Y >= _sourceImage.Height) mouseUpPosition.Y = _sourceImage.Height - 1;
+            IsMouseDown = false;
+            IsSelection = true;
+
         }
 
         /// //////////////////////////// _Threshold_trackBar_Scroll ///////////////////////////////////////////
@@ -393,6 +421,52 @@ namespace DigitalImageProcessing
                 }
                 else if (imageProcess_for_realTime_way == "CamShift")
                 {
+                    if (!IsSelection && !IsTracking)
+                    {
+                        selection = new Rectangle(mouseDownPosition, new Size(mouseUpPosition.X - mouseDownPosition.X, mouseUpPosition.Y - mouseDownPosition.Y));
+                        Graphics sG = _sourcePictureBox.CreateGraphics();
+                        sG.DrawRectangle(new Pen(Color.Red, 10), selection);
+                    }
+                    else if (IsSelection && selection.Height != 0 && selection.Width != 0)
+                    {
+                        //選擇後初始化
+                        rectangle = new Rectangle(new Point(Math.Min(selection.Left, selection.Right), Math.Min(selection.Top, selection.Bottom)), new Size(Math.Abs(selection.Size.Width), Math.Abs(selection.Size.Height)));
+                        IsSelection = false;
+                        IsTracking = true;
+                    }
+                    else if (IsTracking)
+                    {
+                        //開始執行
+                        Image<Hsv, Byte> sourceHSV = new Image<Hsv, Byte>(_sourceImage.Width, _sourceImage.Height);
+                        CvInvoke.CvtColor(_sourceImage, sourceHSV, Emgu.CV.CvEnum.ColorConversion.Bgr2Hsv);    //轉HSV
+
+                        //計算hue
+                        hue._EqualizeHist();
+                        hue = sourceHSV.Split()[0];
+                        hue.ROI = rectangle;
+
+                        //計算mask
+                        mask = sourceHSV.Split()[1].ThresholdBinary(new Gray(60), new Gray(255));
+                        CvInvoke.InRange(sourceHSV, new ScalarArray(new MCvScalar(0, 30, Math.Min(10, 255), 0)), new ScalarArray(new MCvScalar(180, 256, Math.Max(10, 255), 0)), mask);
+                        mask.ROI = rectangle;
+
+                        //計算histogram
+                        hist.Calculate(new Image<Gray, Byte>[] { hue }, false, mask);
+                        CvInvoke.Normalize(hist, hist);
+
+                        //清空ROI
+                        hue.ROI = Rectangle.Empty;
+                        mask.ROI = Rectangle.Empty;
+
+                        //計算backproject
+                        backProjection = hist.BackProject<Byte>(new Image<Gray, Byte>[] { hue });
+                        backProjection._And(mask);
+
+                        //顯示camshift計算結果
+                        Graphics rG = _resultPictureBox.CreateGraphics();
+                        rG.DrawRectangle(new Pen(Color.Green, 10), CvInvoke.CamShift(backProjection, ref rectangle, new MCvTermCriteria(10, 1)).MinAreaRect());
+                    }
+                    //_resultPictureBox.Image = backProjection.Bitmap;    //測試backProject
                     _resultPictureBox.Image = _resultFrame.Bitmap;
                 }
                 else if (imageProcess_for_realTime_way == "Game")
