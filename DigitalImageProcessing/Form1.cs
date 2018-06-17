@@ -34,6 +34,8 @@ namespace DigitalImageProcessing
         // RemovingBackground
         private Color colorForRemovingBackground;
 
+        private bool mousedown = false;
+
         //String[] imageProcess_for_realTime_way = new String[] { "CamShift", "Gray" };
         private String imageProcess_for_realTime_way = "";
 
@@ -46,9 +48,6 @@ namespace DigitalImageProcessing
         // CamShift
         private Mat map;
 
-        private bool mousedown = false;
-        private int mx, my;
-
         private Button nowClick = null;
 
         private DenseHistogram hist = new DenseHistogram(30, new RangeF(0, 180));
@@ -57,7 +56,7 @@ namespace DigitalImageProcessing
         private Image<Gray, Byte> hue = new Image<Gray, Byte>(320, 240),
                                     mask = new Image<Gray, Byte>(320, 240),
                                     backProjection = new Image<Gray, Byte>(320, 240);
-            
+
         public Form1()
         {
             InitializeComponent();
@@ -274,9 +273,8 @@ namespace DigitalImageProcessing
             if (e.Button == MouseButtons.Left)
             {
                 mousedown = true;
-                mx = e.X;
-                my = e.Y;
-                //MessageBox.Show("mouse position = X:" + mx.ToString() + ",Y:" + my.ToString() + "\n");
+                colorForRemovingBackground = Color.FromArgb(_sourceImage.Data[e.Y, e.X, 2], _sourceImage.Data[e.Y, e.X, 1], _sourceImage.Data[e.Y, e.X, 0]);
+                MessageBox.Show("mouse position = X:" + e.X.ToString() + ",Y:" + e.Y.ToString() + "\n");
             }
         }
 
@@ -427,20 +425,14 @@ namespace DigitalImageProcessing
                     /* 在這裡實作 */
                     if (mousedown)
                     {
-                        Image<Bgr, byte> backgroundImage = background.ToImage<Bgr, byte>();
-                        int b, g, r;
-                        b = (int)_sourceImage.Data[my, mx, 0];
-                        g = (int)_sourceImage.Data[my, mx, 1];
-                        r = (int)_sourceImage.Data[my, mx, 2];
-                        //colorForRemovingBackground = Color.FromArgb(_sourceImage.Data[my, mx, 0], _sourceImage.Data[my, mx, 1], _sourceImage.Data[my, mx, 2]);
-
                         _resultImage = _sourceImage;
+                        Image<Bgr, byte> backgroundImage = background.ToImage<Bgr, byte>();
 
                         for (int y = 0; y < _sourceImage.Height; y++)
                         {
                             for (int x = 0; x < _sourceImage.Width; x++)
                             {
-                                if (Math.Abs((int)_sourceImage.Data[y, x, 0] - b) <= _Threshold_trackBar_value && Math.Abs((int)_sourceImage.Data[y, x, 1] - g) <= _Threshold_trackBar_value && Math.Abs((int)_sourceImage.Data[y, x, 2] - r) <= _Threshold_trackBar_value)
+                                if (Math.Abs((int)_sourceImage.Data[y, x, 0] - colorForRemovingBackground.B) < _Threshold_trackBar_value && Math.Abs((int)_sourceImage.Data[y, x, 1] - colorForRemovingBackground.G) < _Threshold_trackBar_value && Math.Abs((int)_sourceImage.Data[y, x, 2] - colorForRemovingBackground.R) < _Threshold_trackBar_value)
                                 {
                                     _resultImage.Data[y, x, 0] = backgroundImage.Data[y, x, 0];
                                     _resultImage.Data[y, x, 1] = backgroundImage.Data[y, x, 1];
@@ -454,10 +446,7 @@ namespace DigitalImageProcessing
                         }
                         _resultPictureBox.Image = _resultImage.Bitmap;
                     }
-
-                    //_resultFrame = imageProcessing.removeBackground_MatToImageWay(_captureFrame, background, _Threshold_trackBar_value, colorForRemovingBackground);
-                    //_resultPictureBox.Image = _resultFrame.Bitmap;
-                    //CvInvoke.PutText(_sourceFrame, "now keyColor is R: " + colorForRemovingBackground.R + " G: " + colorForRemovingBackground.G + " B: " + colorForRemovingBackground.B, new Point(10, 20), Emgu.CV.CvEnum.FontFace.HersheySimplex, 0.4, new MCvScalar(0, 0, 255));
+                    CvInvoke.PutText(_sourceFrame, "now keyColor is R: " + colorForRemovingBackground.R + " G: " + colorForRemovingBackground.G + " B: " + colorForRemovingBackground.B, new Point(10, 20), Emgu.CV.CvEnum.FontFace.HersheySimplex, 0.4, new MCvScalar(0, 0, 255));
                 }
                 else if (imageProcess_for_realTime_way == "CamShift")
                 {
@@ -535,12 +524,12 @@ namespace DigitalImageProcessing
                 ifShow_Threshold_trackBar_Scroll(true);
                 if (nowClick != RemovingBackgrounds_Button)
                 {
-                    /*string fileName2 = LoadImageFile();
-					if (fileName2 != "")
-					{
-						background = new Mat(fileName2);
-					}
-					if (background == null) return;*/
+                    string fileName2 = LoadImageFile();
+                    if (fileName2 != "")
+                    {
+                        background = new Mat(fileName2);
+                    }
+                    if (background == null) return;
                     nowClick = RemovingBackgrounds_Button;
                     setThreshold_trackBar(0, 25600, 3000);
                 }
@@ -549,16 +538,15 @@ namespace DigitalImageProcessing
                 imageProcess_for_realTime_way = "RemovingBackgrounds";
                 if (colorForRemovingBackground.IsEmpty)
                     colorForRemovingBackground = Color.White;
-
                 //MessageBox.Show("請點擊畫面中的一種顏色，以該顏色為key color做藍幕去背！");
                 // 於 TextBox MouseClick事件中，顯示 ColorDialog
                 //if (colorDialog1.ShowDialog() != DialogResult.Cancel)
                 //{
-                //colorForRemovingBackground = colorDialog1.Color;  // 回傳選擇顏色，並且設定 Textbox 的背景顏色
+                //    colorForRemovingBackground = colorDialog1.Color;  // 回傳選擇顏色，並且設定 Textbox 的背景顏色
                 //}
 
                 /* 在這裡實作 */
-                background = new Mat("..\\..\\001.png");
+                //background = new Mat("back5.jpg");
                 CvInvoke.Resize(background, background, new Size(320, 240));
             }
             else
