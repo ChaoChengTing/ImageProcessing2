@@ -42,6 +42,9 @@ namespace DigitalImageProcessing
         // CamShift
         private Mat map;
 
+        private bool mousedown = false;
+        private int mx, my;
+
         private Button nowClick = null;
 
         public Form1()
@@ -257,6 +260,13 @@ namespace DigitalImageProcessing
 
         private void _sourcePictureBox_mouseClick(object sender, MouseEventArgs e)
         {
+            if (e.Button == MouseButtons.Left)
+            {
+                mousedown = true;
+                mx = e.X;
+                my = e.Y;
+                //MessageBox.Show("mouse position = X:" + mx.ToString() + ",Y:" + my.ToString() + "\n");
+            }
         }
 
         private void _sourcePictureBox_mouseDown(object sender, MouseEventArgs e)
@@ -387,9 +397,39 @@ namespace DigitalImageProcessing
                     }
 
                     /* 在這裡實作 */
+                    if (mousedown)
+                    {
+                        Image<Bgr, byte> backgroundImage = background.ToImage<Bgr, byte>();
+                        int b, g, r;
+                        b = (int)_sourceImage.Data[my, mx, 0];
+                        g = (int)_sourceImage.Data[my, mx, 1];
+                        r = (int)_sourceImage.Data[my, mx, 2];
+                        //colorForRemovingBackground = Color.FromArgb(_sourceImage.Data[my, mx, 0], _sourceImage.Data[my, mx, 1], _sourceImage.Data[my, mx, 2]);
 
-                    _resultPictureBox.Image = _resultFrame.Bitmap;
-                    CvInvoke.PutText(_sourceFrame, "now keyColor is R: " + colorForRemovingBackground.R + " G: " + colorForRemovingBackground.G + " B: " + colorForRemovingBackground.B, new Point(10, 20), Emgu.CV.CvEnum.FontFace.HersheySimplex, 0.4, new MCvScalar(0, 0, 255));
+                        _resultImage = _sourceImage;
+
+                        for (int y = 0; y < _sourceImage.Height; y++)
+                        {
+                            for (int x = 0; x < _sourceImage.Width; x++)
+                            {
+                                if (Math.Abs((int)_sourceImage.Data[y, x, 0] - b) <= _Threshold_trackBar_value && Math.Abs((int)_sourceImage.Data[y, x, 1] - g) <= _Threshold_trackBar_value && Math.Abs((int)_sourceImage.Data[y, x, 2] - r) <= _Threshold_trackBar_value)
+                                {
+                                    _resultImage.Data[y, x, 0] = backgroundImage.Data[y, x, 0];
+                                    _resultImage.Data[y, x, 1] = backgroundImage.Data[y, x, 1];
+                                    _resultImage.Data[y, x, 2] = backgroundImage.Data[y, x, 2];
+                                }
+                                else
+                                {
+                                    continue;
+                                }
+                            }
+                        }
+                        _resultPictureBox.Image = _resultImage.Bitmap;
+                    }
+
+                    //_resultFrame = imageProcessing.removeBackground_MatToImageWay(_captureFrame, background, _Threshold_trackBar_value, colorForRemovingBackground);
+                    //_resultPictureBox.Image = _resultFrame.Bitmap;
+                    //CvInvoke.PutText(_sourceFrame, "now keyColor is R: " + colorForRemovingBackground.R + " G: " + colorForRemovingBackground.G + " B: " + colorForRemovingBackground.B, new Point(10, 20), Emgu.CV.CvEnum.FontFace.HersheySimplex, 0.4, new MCvScalar(0, 0, 255));
                 }
                 else if (imageProcess_for_realTime_way == "CamShift")
                 {
@@ -421,6 +461,12 @@ namespace DigitalImageProcessing
                 ifShow_Threshold_trackBar_Scroll(true);
                 if (nowClick != RemovingBackgrounds_Button)
                 {
+                    /*string fileName2 = LoadImageFile();
+					if (fileName2 != "")
+					{
+						background = new Mat(fileName2);
+					}
+					if (background == null) return;*/
                     nowClick = RemovingBackgrounds_Button;
                     setThreshold_trackBar(0, 25600, 3000);
                 }
@@ -429,15 +475,16 @@ namespace DigitalImageProcessing
                 imageProcess_for_realTime_way = "RemovingBackgrounds";
                 if (colorForRemovingBackground.IsEmpty)
                     colorForRemovingBackground = Color.White;
+
                 //MessageBox.Show("請點擊畫面中的一種顏色，以該顏色為key color做藍幕去背！");
                 // 於 TextBox MouseClick事件中，顯示 ColorDialog
                 //if (colorDialog1.ShowDialog() != DialogResult.Cancel)
                 //{
-                //    colorForRemovingBackground = colorDialog1.Color;  // 回傳選擇顏色，並且設定 Textbox 的背景顏色
+                //colorForRemovingBackground = colorDialog1.Color;  // 回傳選擇顏色，並且設定 Textbox 的背景顏色
                 //}
 
                 /* 在這裡實作 */
-                background = new Mat("back5.jpg");
+                background = new Mat("..\\..\\001.png");
                 CvInvoke.Resize(background, background, new Size(320, 240));
             }
             else
